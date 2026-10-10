@@ -25,7 +25,7 @@ Comece com **um servo, um cabo e uma fonte**, sem movimento. Mude uma variável 
 | COM abre, servo não responde | Conversor USB funciona, mas barramento não | Confira GND, sinal, conector, fonte e protocolo; LX-225 usa 115200 baud |
 | Menos servos que o esperado | ID duplicado, cabo interrompido ou servo sem resposta | Consulte cada servo separadamente; configure IDs exclusivos |
 | Leituras intermitentes/pacotes inválidos | Ruído, mau contato, queda de tensão, IDs duplicados | Reduza ao conjunto mínimo e acrescente um servo/cabo por vez |
-| Tensão cai durante movimento | Fonte, cabos ou conectores insuficientes; carga elevada | Interrompa; confira tensão junto ao servo sob carga e dimensionamento; aumentar delta não resolve |
+| Tensão cai durante movimento | Limite de corrente da fonte/regulador muito baixo; fonte, cabos ou conectores insuficientes; carga elevada | Interrompa; confira o limite de corrente e a tensão junto ao servo sob carga. Veja o relato dos testes na [instalação](instalacao.md#1-separe-e-conecte-o-material) |
 | Alvo rejeitado | Fora de 0–240° ou dos limites internos | Leia a posição atual e confira o deslocamento; respeite também os limites mecânicos |
 | Modo motor detectado | Servo configurado para rotação contínua | Consulte o modo e configure modo de posição pelo software apropriado antes de repetir |
 | Torque desligado | Configuração ou proteção do servo | A leitura não habilita torque; o teste só o habilita quando há movimento solicitado e alvo confirmado |

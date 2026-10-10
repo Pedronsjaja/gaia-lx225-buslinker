@@ -38,10 +38,6 @@ SERVO_IDENTIFIERS: Dict[int, str] = {
 }
 
 
-def clamp(value: float, lower: float, upper: float) -> float:
-    return max(lower, min(upper, value))
-
-
 def deg_to_ticks(angle_deg: float) -> int:
     if not math.isfinite(angle_deg) or not ANGLE_MIN_DEG <= angle_deg <= ANGLE_MAX_DEG:
         raise ValueError("Angulo deve ser finito e estar entre 0 e 240 graus.")
@@ -126,20 +122,6 @@ class LX225Bus:
             raise serial.SerialTimeoutException("Escrita serial incompleta.")
         self.ser.flush()
         return packet
-
-    def _collect(self, deadline_s: float) -> bytes:
-        deadline = time.monotonic() + deadline_s
-        data = bytearray()
-
-        while time.monotonic() < deadline:
-            if self.ser.in_waiting:
-                data.extend(self.ser.read(self.ser.in_waiting))
-            else:
-                time.sleep(0.001)
-
-        if self.ser.in_waiting:
-            data.extend(self.ser.read(self.ser.in_waiting))
-        return bytes(data)
 
     @staticmethod
     def _parse_full_packets(raw: bytes) -> List[Tuple[int, int, bytes]]:
@@ -371,9 +353,8 @@ class LX225Bus:
             for servo_id in ids:
                 self._write(servo_id, CMD_MOVE_START)
 
-    def move_many(self, targets: Iterable[Tuple[int, float, float]], *,
-                  synchronized: bool = False) -> None:
-        """Valida todo o lote antes de enviar. Broadcast e opcional."""
+    def _prepare_targets(self, targets: Iterable[Tuple[int, float, float]]) -> List[Tuple[int, bytes]]:
+        """Valida o lote inteiro antes de qualquer envio ao barramento."""
         prepared = []
         seen = set()
         for servo_id, angle, duration in targets:
@@ -382,6 +363,12 @@ class LX225Bus:
                 raise ValueError("IDs repetidos no lote.")
             seen.add(servo_id)
             prepared.append((servo_id, self._move_params(angle, duration)))
+        return prepared
+
+    def move_many(self, targets: Iterable[Tuple[int, float, float]], *,
+                  synchronized: bool = False) -> None:
+        """Valida todo o lote antes de enviar. Broadcast e opcional."""
+        prepared = self._prepare_targets(targets)
         for servo_id, params in prepared:
             self._write(servo_id, CMD_MOVE_TIME_WAIT_WRITE, params)
         self.start([servo_id for servo_id, _ in prepared], synchronized=synchronized)
@@ -392,14 +379,7 @@ class LX225Bus:
         Os inicios tem pequena defasagem, sem preparo nem broadcast.
         O chamador deve conferir limites/torque e parar o grupo em falha.
         """
-        prepared = []
-        seen = set()
-        for sid, angle, duration in targets:
-            validate_id(sid)
-            if sid in seen:
-                raise ValueError('IDs repetidos no lote.')
-            seen.add(sid)
-            prepared.append((sid, self._move_params(angle, duration)))
+        prepared = self._prepare_targets(targets)
         for sid, params in prepared:
             self._write(sid, CMD_MOVE_TIME_WRITE, params)
         for sid, params in prepared:
@@ -415,14 +395,7 @@ class LX225Bus:
         Exige barramento dedicado: o inicio afeta todos os alvos pendentes.
         Em falha de preparo, reinicie a alimentacao antes de tentar novamente.
         """
-        prepared = []
-        seen = set()
-        for sid, angle, duration in targets:
-            validate_id(sid)
-            if sid in seen:
-                raise ValueError('IDs repetidos no lote.')
-            seen.add(sid)
-            prepared.append((sid, self._move_params(angle, duration)))
+        prepared = self._prepare_targets(targets)
         for sid, params in prepared:
             self._write(sid, CMD_MOVE_TIME_WAIT_WRITE, params)
             result = self.read_command(sid, 8, 4)

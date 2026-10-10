@@ -14,17 +14,21 @@
 
 Faça as conexões com a fonte desligada. Confira alimentação, terra comum e sinal pelos rótulos e [diagramas da revisão](datasheets/README.md), não apenas pela cor do cabo. A fonte alimenta os servos; não use só o USB como alimentação de potência.
 
+**Ajuste também o limite de corrente da fonte/regulador.** Nos testes da equipe, pedidos de delta de +100 ou +200 em apenas 1 s ou 0,5 s provocavam queda de tensão no servo. O limite de corrente estava ajustado no mínimo: quando o movimento exigia mais corrente, a fonte atingia esse limite e a tensão de saída caía.
+
+Antes de testar movimentos, ajuste o limite de corrente conforme a necessidade do servo e a capacidade da fonte e dos cabos, mantendo a tensão entre 6 e 8,4 V. Comece com deslocamentos pequenos e lentos e acompanhe a tensão durante o movimento. Os deltas acima descrevem o ocorrido na bancada; o comando `--delta` deste projeto aceita apenas de −100 a +100 graus, respeitando também os limites de posição do servo.
+
 Na V3, o manual de servos padrão indica a seleção **Servo/USB**. Veja a figura do manual antes de colocar os jumpers. Não copie posições físicas entre revisões. Os exemplos com 11,1/12 V do manual são para outros servos: **não aplique essa tensão ao LX-225**.
 
 ## 2. Instale Python e baixe o projeto
 
-Baixe Python no [site oficial](https://www.python.org/downloads/). O código exige Python 3.9 ou superior; a verificação local deste trabalho usa Python 3.13. Se o instalador oferecer inclusão no PATH, habilite-a. Abra um terminal novo:
+Instale Python 3.9 ou superior pelo [site oficial](https://www.python.org/downloads/) e habilite a inclusão no PATH, se oferecida. Abra um terminal novo:
 
 ```powershell
 python --version
 ```
 
-No GitHub, use **Code → Download ZIP** e extraia tudo. Outra opção é copiar a URL HTTPS em **Code** e executar `git clone URL_COPIADA`. Abra a pasta no VS Code ou terminal. Ela deve conter `README.md` e `requirements.txt`.
+No GitHub, use **Code → Download ZIP**, extraia tudo e abra a pasta que contém `README.md` e `requirements.txt` no VS Code ou terminal.
 
 ## 3. Prepare o ambiente no Windows
 
@@ -34,7 +38,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -c "import serial, matplotlib; from servo_testbench import LX225Bus; print('Instalacao OK')"
 ```
 
-O resultado esperado é `Instalacao OK`. `pyserial` acessa a serial e `matplotlib` gera os gráficos.
+O resultado esperado é `Instalacao OK`.
 
 Para executar os exemplos curtos do manual:
 
@@ -59,7 +63,7 @@ Se o PowerShell bloquear a ativação, use `.\.venv\Scripts\python.exe` no lugar
 
 ## 5. Faça a primeira leitura
 
-Conecte um único servo com a fonte desligada, confira a seleção USB e ligue a fonte. Feche Bus Servo Terminal, ServoStudio e monitores seriais que possam ocupar a porta.
+Com um único servo conectado conforme a etapa 1, ligue a fonte. Feche Bus Servo Terminal, ServoStudio e monitores seriais que possam ocupar a porta.
 
 ```powershell
 .\.venv\Scripts\python.exe buslinker_v3.py --port COM7 --scan
