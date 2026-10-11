@@ -1,4 +1,38 @@
-# Gaia — LX-225 e BusLinker V2.5 / V3
+<div align="center">
+
+<h1>⚙️ Gaia &#183; LX-225 / BusLinker</h1>
+<p><strong>Da conex&#227;o do primeiro servo &#224; bancada de diagn&#243;stico e calibra&#231;&#227;o.</strong></p>
+<p><kbd>Python &#183; LX-225 &#183; BusLinker V2.5 / V3</kbd></p>
+
+<p><a href="https://github.com/Pedronsjaja/gaia-lx225-buslinker/stargazers"><img alt="Estrelas no GitHub" src="https://img.shields.io/github/stars/Pedronsjaja/gaia-lx225-buslinker?style=flat-square&amp;color=147d68"/></a> <a href="https://github.com/Pedronsjaja/gaia-lx225-buslinker/commits/main"><img alt="Último commit" src="https://img.shields.io/github/last-commit/Pedronsjaja/gaia-lx225-buslinker?style=flat-square&amp;color=235789"/></a></p>
+<p><a href="#inicio-rapido">Comece aqui</a> · <a href="#guia-do-projeto">Documentação</a> · <a href="https://github.com/Pedronsjaja/gaia-lx225-buslinker/tree/main">Arquivos</a></p>
+
+</div>
+
+<a id="inicio-rapido"></a>
+## 🚀 Comece aqui
+
+**[Instalar e fazer o primeiro teste](docs/instalacao.md)**
+
+| Comunicação | Bancada | Documentação |
+| --- | --- | --- |
+| Biblioteca e programas para cada revisão da placa. | Posição, tensão, temperatura e movimentos de teste. | Manuais, alimentação, IDs e solução de problemas. |
+
+### Caminho do projeto
+
+```mermaid
+flowchart LR
+  N0["Conferir placa"]
+  N1["Instalar dependências"]
+  N0 --> N1
+  N2["Consultar estado"]
+  N1 --> N2
+  N3["Testar movimento"]
+  N2 --> N3
+```
+
+<a id="guia-do-projeto"></a>
+## 📖 Documentação
 
 Bancada e biblioteca Python para o **servo Hiwonder LX-225** com **BusLinker V2.5 ou V3**: comunicação, consulta de posição/tensão/temperatura, movimentos de teste, gráficos, IDs e calibração.
 
@@ -64,3 +98,4 @@ Os testes de software não certificam a montagem elétrica ou mecânica. Corrent
 Cada repositório tem seus próprios arquivos, Issues e histórico. Abra dúvidas na área correspondente; inclua links quando uma mudança depender de outra área.
 
 O antigo repositório `gaia-humanoid-robot` foi renomeado para este endereço. Simulação e arquivos mecânicos passaram para os repositórios acima; o histórico anterior permanece preservado.
+
