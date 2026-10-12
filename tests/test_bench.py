@@ -25,6 +25,7 @@ class ServoSerial(FakeSerial):
             return len(packet)
         params = packet[5:-1]
         reply = {14: bytes([sid]), 19: struct.pack('<b', self.offset),
+                 21: struct.pack('<HH', 0, 1000), 30: bytes(4),
                  26: bytes([35]), 27: struct.pack('<H', 7400), 28: struct.pack('<h', 500)}
         if command == 13:
             self.ids.remove(sid)
@@ -37,6 +38,23 @@ class ServoSerial(FakeSerial):
 
 
 class BenchTests(unittest.TestCase):
+    def test_calibration_preflight_rejects_entire_plan_without_motion(self):
+        from unittest.mock import Mock
+        args = argparse.Namespace(max_temp=60, deltas=[0, 5], seconds=2)
+        for mode, limits, error in [(1, (0, 240), ValueError),
+                                    (0, (118, 122), ValueError),
+                                    (0, TimeoutError('sem resposta'), TimeoutError)]:
+            with self.subTest(mode=mode, limits=limits):
+                bus = self.bus()
+                rec = Mock(live=False)
+                with patch.object(bus, 'read_mode', return_value=mode), \
+                     patch.object(bus, 'read_position_limits',
+                                  **({'side_effect': limits} if isinstance(limits, Exception)
+                                     else {'return_value': limits})):
+                    with self.assertRaises(error):
+                        b.calibrate(bus, args, [1], {}, rec)
+                self.assertFalse({1, 7, 11, 29, 31} & {p[4] for p in bus.ser.packets})
+
     def bus(self):
         bus = d.LX225Bus.__new__(d.LX225Bus)
         bus.ser = ServoSerial()

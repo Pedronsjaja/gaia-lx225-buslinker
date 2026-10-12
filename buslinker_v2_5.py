@@ -607,6 +607,16 @@ def calibrate(bus, args, ids, names, rec):
     # Prevalida todos os alvos antes de qualquer movimento.
     plans = [{s.servo_id: ticks_to_deg(deg_to_ticks(s.angle_deg + delta))
               for s in initial} for delta in args.deltas]
+    # Consultas apenas: nenhum alvo pode ser enviado antes de validar o lote.
+    # Os limites internos nao substituem os limites mecanicos da montagem.
+    for sid in ids:
+        if bus.read_mode(sid) != 0:
+            raise ValueError(f'ID {sid}: nao esta em modo de posicao.')
+        lower, upper = bus.read_position_limits(sid)
+        for targets in plans:
+            if not lower <= targets[sid] <= upper:
+                raise ValueError(f'ID {sid}: alvo {targets[sid]:.2f} fora dos limites '
+                                 f'internos {lower:.2f} a {upper:.2f} graus.')
     results = []
     try:
         for targets in plans:
