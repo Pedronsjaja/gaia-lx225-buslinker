@@ -49,6 +49,8 @@ class Recorder:
         self.writer = csv.DictWriter(self.file, fieldnames=FIELDS)
         self.writer.writeheader()
         self.rows = []
+        self.run_status = "collection"
+        self.requested_seconds = math.nan
         self.start = time.monotonic()
         self.live = live
         self.fig, self.axes = plt.subplots(2, 2, figsize=(12, 8))
@@ -86,7 +88,15 @@ class Recorder:
                 if field == 'angle_deg' and any(math.isfinite(r['target_deg']) for r in rows):
                     ax.step([r['time_s'] for r in rows], [r['target_deg'] for r in rows],
                             where='post', linestyle='--', label=f'Alvo {sid}')
-            ax.set(xlabel='Tempo (s)', ylabel=title)
+                valid = [r for r in rows if math.isfinite(r[field])]
+                if valid and field != 'velocity_dps':
+                    first, last = valid[0], valid[-1]
+                    ax.scatter([first['time_s']], [first[field]], marker='o',
+                               label=f'Inicial {sid}: {first[field]:.2f}')
+                    if len(valid) > 1:
+                        ax.scatter([last['time_s']], [last[field]], marker='x',
+                                   label=f'Ultima leitura {sid}: {last[field]:.2f}')
+            ax.set(xlabel='Tempo desde leitura inicial (s)', ylabel=title)
             ax.grid(True, alpha=0.3)
             if self.rows:
                 ax.legend()
@@ -94,8 +104,34 @@ class Recorder:
         if self.live:
             self.plt.pause(0.001)
 
+    def save_summary(self):
+        summaries = []
+        for sid in sorted({r['servo_id'] for r in self.rows}):
+            rows = [r for r in self.rows if r['servo_id'] == sid]
+            valid = [r for r in rows if math.isfinite(r['angle_deg'])]
+            first = valid[0] if valid else {}
+            last = valid[-1] if len(valid) > 1 else {}
+            row = dict(servo_id=sid, run_status=self.run_status,
+                       requested_seconds=self.requested_seconds,
+                       initial_time_s=first.get('time_s', math.nan),
+                       last_time_s=last.get('time_s', math.nan),
+                       observed_duration_s=last.get('time_s', math.nan)-first.get('time_s', math.nan),
+                       sample_count=len(valid), failure_count=sum(r['status'] not in ('ok', 'initial') for r in rows))
+            for field in ('angle_deg', 'voltage_v', 'temperature_c'):
+                row['initial_' + field] = first.get(field, math.nan)
+                row['last_' + field] = last.get(field, math.nan)
+            row['last_target_deg'] = last.get('target_deg', math.nan)
+            row['last_error_deg'] = last.get('error_deg', math.nan)
+            summaries.append(row)
+        if summaries:
+            with (self.folder / 'comparacao.csv').open('w', newline='', encoding='utf-8') as file:
+                writer = csv.DictWriter(file, fieldnames=list(summaries[0]))
+                writer.writeheader()
+                writer.writerows(summaries)
+
     def close(self):
         self.file.close()
+        self.save_summary()
         self.draw()
         self.fig.savefig(self.folder / 'graficos.png', dpi=160)
         self.plt.close(self.fig)

@@ -278,3 +278,24 @@ de desenvolvimento. Depois de altera-los, execute `python tools/build_standalone
 para atualizar os dois arquivos completos de forma identica. Alteracoes manuais
 nos arquivos gerados serao substituidas na proxima geracao. Para nomes dos servos,
 prefira o comando `add-id`, que salva em `servos.json` fora do codigo.
+
+
+## Gráficos ao mover (V2.5 e V3.0)
+
+Execute `python buslinker_v2_5.py --interactive` (ou `buslinker_v3.py`).
+As opções 2 e 4 abrem gráficos de posição/alvo, velocidade estimada, tensão e temperatura.
+Cada movimento salva `telemetria.csv`, `comparacao.csv` e `graficos.png` em
+`resultados/<data_hora>/`. Use `--output PASTA` para escolher o destino e `--no-live`
+para salvar sem janela. A janela fecha ao concluir; o PNG permanece disponível.
+
+Exemplo, após confirmar porta, IDs e percurso livre:
+
+```powershell
+python buslinker_v2_5.py --port COM5 --ids 1 2 --move --delta 5 --seconds 2
+```
+
+COM5 e IDs 1/2 são exemplos; um servo usa `--ids 1`. Para V3 troque o nome do script.
+A comparação traz posição/tensão/temperatura iniciais e últimas, alvo quantizado,
+erro, tempo comandado e intervalo observado. `completed` significa fim da coleta,
+não comprovação de atingir ou estabilizar no alvo. `interrupted` indica dados parciais;
+NaN representa leitura ausente. Consulte a [decisão e limites](engineering-decisions/2026-10-14-graficos-movimento.md).

@@ -10,6 +10,13 @@ import buslinker_v2_5 as v25
 
 
 class InteractiveTests(unittest.TestCase):
+    def setUp(self):
+        for module in (cli, v3, v25):
+            patcher = patch.object(module, 'Recorder')
+            recorder = patcher.start().return_value
+            recorder.live = False
+            self.addCleanup(patcher.stop)
+
     def bus(self, angle=150, voltage=7.4):
         bus = MagicMock()
         bus.read_servo.return_value = driver.ServoState(6, 'servo_6', angle, voltage, 0, temperature_c=31)
@@ -110,7 +117,7 @@ class InteractiveTests(unittest.TestCase):
     def test_group_menu_uses_each_position_and_enables_torque(self):
         for module in (cli, v3, v25):
             bus = self.bus()
-            bus.read_servo.side_effect = lambda sid: driver.ServoState(sid, str(sid), {5: 120, 6: 150}[sid], 7.4, 0)
+            bus.read_servo.side_effect = lambda sid: driver.ServoState(sid, str(sid), {5: 120, 6: 150}[sid], 7.4, 0, temperature_c=31)
             bus.read_torque_enabled.return_value = False
             with patch('builtins.input', side_effect=['4', '5 6', '5', '3', '0']), patch.object(module.time, 'monotonic', side_effect=[0, 4]), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(module.interactive_menu(bus, [5, 6]), 0)
@@ -121,7 +128,7 @@ class InteractiveTests(unittest.TestCase):
 
     def test_group_menu_requires_both_responses(self):
         bus = self.bus()
-        bus.read_servo.side_effect = [driver.ServoState(5, '5', 120, 7.4, 0), TimeoutError('ID 6 sem resposta')]
+        bus.read_servo.side_effect = [driver.ServoState(5, '5', 120, 7.4, 0, temperature_c=31), TimeoutError('ID 6 sem resposta')]
         with patch('builtins.input', side_effect=['4', '', '', '', '0']), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(cli.interactive_menu(bus, [5, 6]), 0)
         bus.move_many_verified.assert_not_called()
@@ -141,7 +148,7 @@ class InteractiveTests(unittest.TestCase):
         bus = self.bus()
         bus.read_torque_enabled.return_value = False
         bus.read_position_limits.return_value = (30, 210)
-        states = [driver.ServoState(5, '5', 120, 7.4, 0), driver.ServoState(6, '6', 209, 7.4, 0)]
+        states = [driver.ServoState(5, '5', 120, 7.4, 0, temperature_c=31), driver.ServoState(6, '6', 209, 7.4, 0, temperature_c=31)]
         with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(ValueError):
             cli.test_movement(bus, states, 5, 3, synchronized=True)
         bus.move_many_verified.assert_not_called()
@@ -150,7 +157,7 @@ class InteractiveTests(unittest.TestCase):
     def test_group_failed_prepare_stops_all(self):
         bus = self.bus()
         bus.move_many_verified.side_effect = ValueError('alvo nao confirmado')
-        states = [driver.ServoState(5, '5', 120, 7.4, 0), driver.ServoState(6, '6', 150, 7.4, 0)]
+        states = [driver.ServoState(5, '5', 120, 7.4, 0, temperature_c=31), driver.ServoState(6, '6', 150, 7.4, 0, temperature_c=31)]
         with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(ValueError):
             cli.test_movement(bus, states, 5, 3, synchronized=True)
         self.assertEqual(bus.stop.call_args_list, [call(5), call(6)])
@@ -158,7 +165,7 @@ class InteractiveTests(unittest.TestCase):
     def test_direct_group_failure_stops_both(self):
         bus = self.bus()
         bus.move_group_direct.side_effect = ValueError('alvo direto nao confirmado')
-        states = [driver.ServoState(5, '5', 120, 7.4, 0), driver.ServoState(6, '6', 150, 7.4, 0)]
+        states = [driver.ServoState(5, '5', 120, 7.4, 0, temperature_c=31), driver.ServoState(6, '6', 150, 7.4, 0, temperature_c=31)]
         with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(ValueError):
             cli.test_movement(bus, states, -20, 3)
         self.assertEqual(bus.stop.call_args_list, [call(5), call(6)])
@@ -167,7 +174,7 @@ class InteractiveTests(unittest.TestCase):
     def test_cli_multiple_ids_defaults_to_direct_group(self):
         for module in (cli, v3, v25):
             bus = self.bus()
-            bus.read_servo.side_effect = lambda sid: driver.ServoState(sid, str(sid), {5: 204.96, 6: 204.72}[sid], 7.4, 0)
+            bus.read_servo.side_effect = lambda sid: driver.ServoState(sid, str(sid), {5: 204.96, 6: 204.72}[sid], 7.4, 0, temperature_c=31)
             factory = MagicMock()
             factory.return_value.__enter__.return_value = bus
             with patch('sys.argv', ['servo.py', '--port', 'COM7', '--ids', '5', '6', '--move', '--delta', '-50', '--seconds', '3']), patch.object(module.time, 'monotonic', side_effect=[0, 4]), contextlib.redirect_stdout(io.StringIO()):
@@ -179,8 +186,8 @@ class InteractiveTests(unittest.TestCase):
         for module in (cli, v3, v25):
             for voltage in (3.371, 8.5, float('nan')):
                 bus = self.bus()
-                states = [driver.ServoState(5, '5', 204.96, 7.4, 0), driver.ServoState(6, '6', 204.72, 7.4, 0)]
-                bus.read_servo.return_value = driver.ServoState(5, '5', 203.52, voltage, 0)
+                states = [driver.ServoState(5, '5', 204.96, 7.4, 0, temperature_c=31), driver.ServoState(6, '6', 204.72, 7.4, 0, temperature_c=31)]
+                bus.read_servo.return_value = driver.ServoState(5, '5', 203.52, voltage, 0, temperature_c=31)
                 with patch.object(module.time, 'monotonic', return_value=0), contextlib.redirect_stdout(io.StringIO()), self.assertRaisesRegex(ValueError, 'durante o movimento'):
                     module.test_movement(bus, states, -50, 2)
                 bus.read_servo.assert_called_once_with(5)

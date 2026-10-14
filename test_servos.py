@@ -7,6 +7,7 @@ import time
 import serial
 from serial.tools import list_ports
 from servo_testbench import LX225Bus, validate_id
+from bench_tools import Recorder, check_state
 
 
 def select_port(port):
@@ -47,7 +48,7 @@ def discover_servos(bus):
     return ids
 
 
-def test_movement(bus, states, delta, seconds, synchronized=False):
+def test_movement(bus, states, delta, seconds, synchronized=False, rec=None):
     if not states or len({s.servo_id for s in states}) != len(states):
         raise ValueError('Selecione IDs distintos para movimentar.')
     if not math.isfinite(delta) or abs(delta) > 100:
@@ -56,6 +57,11 @@ def test_movement(bus, states, delta, seconds, synchronized=False):
         raise ValueError('Tempo deve estar entre 0.5 e 30 segundos.')
     targets = [(s.servo_id, s.angle_deg + delta, seconds) for s in states]
     needs_torque = []
+    for state in states:
+        check_state(state, 60)
+    if rec is not None:
+        for state in states:
+            rec.add(state, status="initial")
     for sid, angle, duration in targets:
         if not math.isfinite(angle) or not 0 <= angle <= 240:
             raise ValueError(f'ID {sid}: alvo {angle:.2f} graus fora de 0 a 240. Reduza o deslocamento ou inverta o sentido.')
@@ -89,7 +95,15 @@ def test_movement(bus, states, delta, seconds, synchronized=False):
         end = time.monotonic() + seconds + 0.5
         while time.monotonic() < end:
             for state in states:
-                measured = bus.read_servo(state.servo_id)
+                try:
+                    measured = bus.read_servo(state.servo_id)
+                except (TimeoutError, serial.SerialException, OSError) as exc:
+                    if rec is not None:
+                        rec.failure(state.servo_id, exc)
+                    raise
+                if rec is not None:
+                    target = next(a for sid, a, _ in targets if sid == state.servo_id)
+                    rec.add(measured, round(target / 0.24) * 0.24)
                 print(measured)
                 if not 6 <= measured.voltage_v <= 8.4:
                     raise ValueError(
@@ -97,7 +111,20 @@ def test_movement(bus, states, delta, seconds, synchronized=False):
                         'fora de 6 a 8.4 V durante o movimento. Teste interrompido; '
                         'confira fonte, limite de corrente, cabos e conexoes antes de repetir.'
                     )
+                check_state(measured, 60)
+            if rec is not None and rec.live:
+                rec.draw()
             time.sleep(0.1)
+        if rec is not None:
+            # Explicit end-of-window measurement; never substitute the command for feedback.
+            for sid, target, _ in targets:
+                try:
+                    measured = bus.read_servo(sid)
+                except (TimeoutError, serial.SerialException, OSError) as exc:
+                    rec.failure(sid, exc)
+                    raise
+                rec.add(measured, round(target / 0.24) * 0.24)
+                check_state(measured, 60)
     finally:
         for state in states:
             try:
@@ -106,7 +133,23 @@ def test_movement(bus, states, delta, seconds, synchronized=False):
                 print(f'Falha ao parar ID {state.servo_id}: {exc}', file=sys.stderr)
 
 
-def interactive_menu(bus, ids):
+def recorded_movement(bus, states, delta, seconds, synchronized=False,
+                      output='resultados', live=True):
+    rec = Recorder(output, live)
+    # Initial readings precede plot creation: retain their acquisition timestamps.
+    stamps = [s.position_time_s for s in states if math.isfinite(s.position_time_s)]
+    if stamps:
+        rec.start = min(stamps)
+    rec.run_status = 'interrupted'
+    rec.requested_seconds = seconds
+    try:
+        test_movement(bus, states, delta, seconds, synchronized, rec=rec)
+        rec.run_status = 'completed'
+    finally:
+        rec.close()
+
+
+def interactive_menu(bus, ids, output='resultados', live=True):
     print('\nTeste de movimento: deixe o eixo livre. Cada movimento parte da posicao atual.')
     while True:
         print('\n1 - Ler posicao, tensao e temperatura')
@@ -138,7 +181,7 @@ def interactive_menu(bus, ids):
                 delta = float((input('Deslocamento para todos em graus (-100 a +100) [5]: ').strip() or '5').replace(',', '.'))
                 seconds = float((input('Tempo para todos em segundos (0.5 a 30) [2]: ').strip() or '2').replace(',', '.'))
                 states = [bus.read_servo(sid) for sid in selected]
-                test_movement(bus, states, delta, seconds)
+                recorded_movement(bus, states, delta, seconds, output=output, live=live)
                 show_states(bus, selected)
             elif choice == '2':
                 if not ids:
@@ -153,7 +196,7 @@ def interactive_menu(bus, ids):
                 seconds = float((input('Tempo em segundos (0.5 a 30) [2]: ').strip() or '2').replace(',', '.'))
                 # Consulta fresca antes de calcular o alvo; nunca usa a posicao antiga da busca.
                 state = bus.read_servo(sid)
-                test_movement(bus, [state], delta, seconds)
+                recorded_movement(bus, [state], delta, seconds, output=output, live=live)
                 show_states(bus, [sid])
             else:
                 print('Opcao invalida.')
@@ -177,6 +220,8 @@ def main(bus_class=LX225Bus):
     parser.add_argument('--delta', type=float, default=5.0, help='Deslocamento relativo de -100 a +100 graus (padrao: 5)')
     parser.add_argument('--seconds', type=float, default=2.0)
     parser.add_argument('--synchronized', action='store_true', help='Inicia TODOS os movimentos pendentes por broadcast')
+    parser.add_argument("--output", default="resultados", help="Pasta dos CSV e graficos")
+    parser.add_argument("--no-live", action="store_true", help="Salva graficos sem abrir janela")
     args = parser.parse_args()
     try:
         interactive = args.interactive or (len(sys.argv) == 1 and sys.stdin.isatty())
@@ -203,13 +248,13 @@ def main(bus_class=LX225Bus):
                     return 1
             states = show_states(bus, args.ids)
             if interactive:
-                return interactive_menu(bus, args.ids)
+                return interactive_menu(bus, args.ids, args.output, not args.no_live)
             if len(states) != len(args.ids):
                 return 1
             if args.move:
-                test_movement(bus, states, args.delta, args.seconds, args.synchronized)
+                recorded_movement(bus, states, args.delta, args.seconds, args.synchronized, args.output, not args.no_live)
         return 0
-    except (ValueError, TimeoutError, serial.SerialException, OSError) as exc:
+    except (ValueError, TimeoutError, serial.SerialException, OSError, ImportError) as exc:
         print(f'Falha: {exc}', file=sys.stderr)
         return 1
     except KeyboardInterrupt:
