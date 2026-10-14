@@ -99,3 +99,7 @@ Cada repositório tem seus próprios arquivos, Issues e histórico. Abra dúvida
 
 O antigo repositório `gaia-humanoid-robot` foi renomeado para este endereço. Simulação e arquivos mecânicos passaram para os repositórios acima; o histórico anterior permanece preservado.
 
+
+## Windows 10/11 e Linux
+
+Consulte o [guia de instalação e testes por sistema](docs/windows-linux.md): drivers USB, Ubuntu/Debian/Mint/Pop!_OS, ambiente Python, gráficos e ensaios com um ou vários servos.

@@ -109,3 +109,7 @@ python -m serial.tools.list_ports -v
 Use a porta encontrada, como `/dev/ttyUSB0` ou `/dev/cu.usbserial-...`. No Ubuntu/Debian, instale `python3-venv` se o sistema indicar ausência. Para permissão serial, consulte `ls -l /dev/ttyUSB0`; se o grupo for `dialout`, use `sudo usermod -aG dialout "$USER"` e faça logout/login. Evite executar a bancada como root.
 
 O [fabricante WCH](https://www.wch-ic.com/downloads/CH341SER.EXE.html?type=en) também disponibiliza pacotes Linux/macOS. Confira primeiro se o sistema já reconhece o conversor. Essas plataformas não foram verificadas em hardware neste trabalho.
+
+## Roteiros completos por sistema
+
+Veja [Windows 10/11 e Ubuntu/Linux](windows-linux.md) para comandos completos, dependência Tk dos gráficos, testes sem hardware e sequência de ensaio com um ou vários servos.

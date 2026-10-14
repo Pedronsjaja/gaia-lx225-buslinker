@@ -49,3 +49,7 @@ Para posições dos jumpers e telas, consulte os [manuais locais](datasheets/REA
 ## Estrutura e CAD
 
 Para abrir o CAD do servo e editar suportes, consulte [softwares CAD no repositório de estrutura](https://github.com/Pedronsjaja/gaia-humanoid-structure/blob/main/docs/softwares-cad.md).
+
+## Windows 10/11 e Ubuntu/Linux
+
+O [guia por sistema](windows-linux.md) reúne downloads oficiais, identificação do chip, driver ch341 do kernel Linux, permissões seriais e testes dos gráficos. Não é necessário baixar instalador USB quando o sistema já reconhece corretamente a placa.

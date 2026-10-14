@@ -15,7 +15,7 @@ Comece com **um servo, um cabo e uma fonte**, sem movimento. Mude uma variável 
 | Access denied / PermissionError | COM ocupada ou permissão | Feche softwares/monitores; no Linux confira grupo da porta |
 | Porta não existe | COM mudou ou USB desconectou | Execute `python -m serial.tools.list_ports -v` novamente |
 | Várias portas disponíveis | Seleção automática ambígua | Informe `--port COM7` com a porta real |
-| Gráfico não abre | Ambiente sem interface gráfica ou backend indisponível | Teste sem `--live` e confira o arquivo em resultados/; use ambiente desktop para a janela |
+| Gráfico não abre | Ambiente sem interface gráfica ou backend indisponível | Nos movimentos use `--no-live`; em monitor/calibrate omita `--live`. Confira resultados/; para janela use desktop e Tk conforme o [guia por sistema](windows-linux.md) |
 
 ## Comunicação e movimento
 
