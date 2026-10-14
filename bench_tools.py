@@ -42,7 +42,21 @@ class Recorder:
         if not live:
             matplotlib.use('Agg')
         import matplotlib.pyplot as plt
+        # A previous headless export or MPLBACKEND=Agg must not silently disable live plots.
+        fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+        if live and fig.canvas.required_interactive_framework is None:
+            plt.close(fig)
+            try:
+                plt.switch_backend('TkAgg')
+                fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+            except (ImportError, RuntimeError) as exc:
+                raise ImportError(
+                    'Nao foi possivel abrir a janela dos graficos. Instale/ative Tkinter '
+                    'no Python utilizado (Linux: python3-tk), ou use --no-live para salvar PNG. '
+                    'Teste sem servos: python test_servos.py --plot-test.'
+                ) from exc
         self.plt = plt
+        self.fig, self.axes = fig, axes
         self.folder = Path(folder) / datetime.now().strftime('%Y%m%d_%H%M%S_%f')
         self.folder.mkdir(parents=True)
         self.file = (self.folder / 'telemetria.csv').open('w', newline='', encoding='utf-8')
@@ -53,10 +67,13 @@ class Recorder:
         self.requested_seconds = math.nan
         self.start = time.monotonic()
         self.live = live
-        self.fig, self.axes = plt.subplots(2, 2, figsize=(12, 8))
         if live:
+            print(f'Graficos ao vivo: backend {matplotlib.get_backend()}; '
+                  f'arquivos em {self.folder.resolve()}', flush=True)
             plt.ion()
             plt.show(block=False)
+            self.fig.canvas.draw()
+            self.fig.canvas.flush_events()
 
     def add(self, state, target=math.nan, status='ok'):
         stamp = state.position_time_s
@@ -116,7 +133,7 @@ class Recorder:
                        initial_time_s=first.get('time_s', math.nan),
                        last_time_s=last.get('time_s', math.nan),
                        observed_duration_s=last.get('time_s', math.nan)-first.get('time_s', math.nan),
-                       sample_count=len(valid), failure_count=sum(r['status'] not in ('ok', 'initial') for r in rows))
+                       sample_count=len(valid), failure_count=sum(r['status'] not in ('ok', 'initial', 'simulated') for r in rows))
             for field in ('angle_deg', 'voltage_v', 'temperature_c'):
                 row['initial_' + field] = first.get(field, math.nan)
                 row['last_' + field] = last.get(field, math.nan)
@@ -134,8 +151,33 @@ class Recorder:
         self.save_summary()
         self.draw()
         self.fig.savefig(self.folder / 'graficos.png', dpi=160)
-        self.plt.close(self.fig)
         print(f'CSV e graficos: {self.folder.resolve()}')
+        try:
+            if self.live:
+                print('Graficos salvos. Feche a janela dos graficos para continuar.', flush=True)
+                self.plt.show(block=True)
+        finally:
+            self.plt.close(self.fig)
+
+
+def plot_demo(output='resultados', live=True):
+    """Exercise the real plot pipeline with explicitly simulated data, without serial access."""
+    from types import SimpleNamespace
+    rec = Recorder(output, live)
+    rec.fig.suptitle('SIMULADO - teste dos graficos, sem conexao com servos')
+    rec.run_status = 'simulated'
+    try:
+        for index in range(21):
+            t = index / 10
+            for sid, direction in ((1, 1), (2, -1)):
+                state = SimpleNamespace(servo_id=sid, identifier=f'SIMULATED_{sid}',
+                    position_time_s=rec.start + t, angle_deg=100 + direction * 10 * t,
+                    voltage_v=7.4, velocity_dps=direction * 10, temperature_c=30)
+                rec.add(state, target=100 + direction * 20, status='simulated')
+        rec.draw()
+    finally:
+        rec.close()
+    return 0
 
 
 def check_state(state, max_temp):

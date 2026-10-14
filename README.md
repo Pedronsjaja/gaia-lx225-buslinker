@@ -56,6 +56,18 @@ Bancada e biblioteca Python para o **servo Hiwonder LX-225** com **BusLinker V2.
 
 ## Qual programa usar?
 
+Para conferir os quatro gráficos **sem conectar ou mover servos**, execute:
+
+```powershell
+python test_servos.py --plot-test
+```
+
+A janela usa dados marcados como **SIMULADOS** e permanece aberta até ser fechada.
+O mesmo argumento funciona em `buslinker_v2_5.py` e `buslinker_v3.py`.
+Nos movimentos do menu (`--interactive`, opções 2 e 4), os gráficos usam o
+feedback dos servos. A opção 4 permite uma posição absoluta diferente por ID.
+O programa imprime seu caminho ao iniciar, para identificar cópias antigas.
+
 | Placa | Programa independente | Classe |
 | --- | --- | --- |
 | BusLinker V2.5 | [buslinker_v2_5.py](buslinker_v2_5.py) | `BusLinkerV2_5` |

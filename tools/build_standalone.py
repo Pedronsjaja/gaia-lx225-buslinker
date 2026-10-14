@@ -13,7 +13,7 @@ def build():
     cli = (ROOT / 'test_servos.py').read_text(encoding='utf-8').split('\n', 1)[1]
     cli = cli.replace('from servo_testbench import LX225Bus, validate_id\n', '')
     cli = cli.replace('    from bench_tools import COMMANDS, main as tools_main\n', '')
-    cli = cli.replace('from bench_tools import Recorder, check_state\n', '')
+    cli = cli.replace('from bench_tools import Recorder, check_state, plot_demo\n', '')
     cli = cli.split("\nif __name__ == '__main__':")[0]
     for version, filename, classname in [('2.5', 'buslinker_v2_5.py', 'BusLinkerV2_5'),
                                           ('3.0', 'buslinker_v3.py', 'BusLinkerV3')]:

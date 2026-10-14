@@ -34,6 +34,15 @@ class InteractiveTests(unittest.TestCase):
             bus.move_many.assert_not_called()
             bus.stop.assert_not_called()
 
+    def test_plot_test_never_opens_serial(self):
+        for module in (cli, v3, v25):
+            factory = MagicMock()
+            with patch('sys.argv', ['servo.py', '--plot-test', '--no-live']), \
+                 patch.object(module, 'plot_demo', return_value=0) as demo:
+                self.assertEqual(module.main(factory), 0)
+                demo.assert_called_once_with('resultados', False)
+                factory.assert_not_called()
+
     def test_menu_uses_fresh_position_and_selected_duration(self):
         for module in (cli, v3, v25):
             bus = self.bus(angle=151.68)
@@ -119,17 +128,17 @@ class InteractiveTests(unittest.TestCase):
             bus = self.bus()
             bus.read_servo.side_effect = lambda sid: driver.ServoState(sid, str(sid), {5: 120, 6: 150}[sid], 7.4, 0, temperature_c=31)
             bus.read_torque_enabled.return_value = False
-            with patch('builtins.input', side_effect=['4', '5 6', '5', '3', '0']), patch.object(module.time, 'monotonic', side_effect=[0, 4]), contextlib.redirect_stdout(io.StringIO()):
+            with patch('builtins.input', side_effect=['4', '5,6', '125,5', '140', '3', '0']), patch.object(module.time, 'monotonic', side_effect=[0, 4]), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(module.interactive_menu(bus, [5, 6]), 0)
             self.assertEqual(bus.move_verified.call_args_list, [call(5, 120, 0.5), call(6, 150, 0.5)])
-            bus.move_group_direct.assert_called_once_with([(5, 125, 3), (6, 155, 3)])
+            bus.move_group_direct.assert_called_once_with([(5, 125.5, 3), (6, 140, 3)])
             bus.move_many_verified.assert_not_called()
             self.assertEqual(bus.stop.call_args_list, [call(5), call(6)])
 
     def test_group_menu_requires_both_responses(self):
         bus = self.bus()
         bus.read_servo.side_effect = [driver.ServoState(5, '5', 120, 7.4, 0, temperature_c=31), TimeoutError('ID 6 sem resposta')]
-        with patch('builtins.input', side_effect=['4', '', '', '', '0']), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        with patch('builtins.input', side_effect=['4', '', '125', '140', '', '0']), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(cli.interactive_menu(bus, [5, 6]), 0)
         bus.move_many_verified.assert_not_called()
         bus.move_group_direct.assert_not_called()

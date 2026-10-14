@@ -284,6 +284,21 @@ prefira o comando `add-id`, que salva em `servos.json` fora do codigo.
 
 Execute `python buslinker_v2_5.py --interactive` (ou `buslinker_v3.py`).
 As opções 2 e 4 abrem gráficos de posição/alvo, velocidade estimada, tensão e temperatura.
+Ao terminar a coleta, a janela permanece aberta para inspeção: feche-a para
+voltar ao menu. PNG e CSV são salvos antes dessa espera. `--no-live` apenas salva,
+sem abrir janela. É necessário um backend gráfico funcional do Matplotlib.
+Se o backend atual apenas exporta arquivos (por exemplo Agg), o modo ao vivo
+tenta abrir TkAgg; se não conseguir, informa a falha antes de mover.
+`python test_servos.py --plot-test` testa a janela com dados SIMULADOS e sem
+serial. Esse argumento também funciona nos programas autônomos V2.5 e V3.
+`--plot-test --no-live` valida apenas exportação PNG/CSV.
+A opção 2 usa deslocamento relativo. A opção 4 pede uma **posição absoluta por ID**,
+seguida de um tempo comum. Exemplo de entradas: opção `4`, IDs `1 2`, alvo do ID 1
+`90`, alvo do ID 2 `120`, tempo `2` segundos. Esses alvos são ilustrativos; confira
+o percurso da montagem. IDs aceitam espaço ou vírgula, sem aspas; ângulos aceitam
+vírgula decimal. Todos os alvos são validados antes de habilitar torque ou mover:
+faixa de 0–240°, limites internos e deslocamento máximo de 100° desde a leitura
+atual. Os comandos começam em sequência rápida, sem simultaneidade garantida.
 Cada movimento salva `telemetria.csv`, `comparacao.csv` e `graficos.png` em
 `resultados/<data_hora>/`. Use `--output PASTA` para escolher o destino e `--no-live`
 para salvar sem janela. A janela fecha ao concluir; o PNG permanece disponível.

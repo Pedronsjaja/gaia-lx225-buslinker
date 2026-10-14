@@ -38,6 +38,37 @@ class ServoSerial(FakeSerial):
 
 
 class BenchTests(unittest.TestCase):
+    def test_plot_demo_labels_simulated_data_and_exports_four_panels(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(b.plot_demo(tmp, live=False), 0)
+            folder = next(Path(tmp).iterdir())
+            self.assertGreater((folder / 'graficos.png').stat().st_size, 1000)
+            with (folder / 'telemetria.csv').open() as file:
+                rows = list(csv.DictReader(file))
+            self.assertEqual(len(rows), 42)
+            self.assertEqual({r['status'] for r in rows}, {'simulated'})
+            with (folder / 'comparacao.csv').open() as file:
+                summaries = list(csv.DictReader(file))
+            self.assertEqual({r['run_status'] for r in summaries}, {'simulated'})
+            self.assertEqual({r['failure_count'] for r in summaries}, {'0'})
+
+    def test_live_plot_waits_after_saving_and_closes_after_display(self):
+        for live in (False, True):
+            with self.subTest(live=live), tempfile.TemporaryDirectory() as tmp:
+                rec = b.Recorder(tmp, live=False)
+                rec.live = live
+                def display(**kwargs):
+                    self.assertEqual(kwargs, {'block': True})
+                    self.assertTrue(rec.file.closed)
+                    self.assertGreater((rec.folder / 'graficos.png').stat().st_size, 1000)
+                    close.assert_not_called()
+                with patch.object(rec.plt, 'pause'), \
+                     patch.object(rec.plt, 'show', side_effect=display) as show, \
+                     patch.object(rec.plt, 'close', wraps=rec.plt.close) as close:
+                    rec.close()
+                    self.assertEqual(show.call_count, int(live))
+                    close.assert_called_once_with(rec.fig)
+
     def test_calibration_preflight_rejects_entire_plan_without_motion(self):
         from unittest.mock import Mock
         args = argparse.Namespace(max_temp=60, deltas=[0, 5], seconds=2)

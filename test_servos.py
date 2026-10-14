@@ -7,7 +7,7 @@ import time
 import serial
 from serial.tools import list_ports
 from servo_testbench import LX225Bus, validate_id
-from bench_tools import Recorder, check_state
+from bench_tools import Recorder, check_state, plot_demo
 
 
 def select_port(port):
@@ -48,14 +48,23 @@ def discover_servos(bus):
     return ids
 
 
-def test_movement(bus, states, delta, seconds, synchronized=False, rec=None):
+def test_movement(bus, states, delta, seconds, synchronized=False, rec=None, target_angles=None):
     if not states or len({s.servo_id for s in states}) != len(states):
         raise ValueError('Selecione IDs distintos para movimentar.')
     if not math.isfinite(delta) or abs(delta) > 100:
         raise ValueError('Delta deve estar entre -100 e 100 graus.')
     if not math.isfinite(seconds) or not 0.5 <= seconds <= 30:
         raise ValueError('Tempo deve estar entre 0.5 e 30 segundos.')
-    targets = [(s.servo_id, s.angle_deg + delta, seconds) for s in states]
+    if target_angles is None:
+        targets = [(s.servo_id, s.angle_deg + delta, seconds) for s in states]
+    else:
+        if set(target_angles) != {s.servo_id for s in states}:
+            raise ValueError('Informe uma posicao alvo para cada ID selecionado.')
+        targets = [(s.servo_id, target_angles[s.servo_id], seconds) for s in states]
+        for state in states:
+            angle = target_angles[state.servo_id]
+            if not math.isfinite(angle) or abs(angle - state.angle_deg) > 100:
+                raise ValueError(f'ID {state.servo_id}: alvo deve ser finito e ficar a no maximo 100 graus da posicao atual.')
     needs_torque = []
     for state in states:
         check_state(state, 60)
@@ -134,7 +143,7 @@ def test_movement(bus, states, delta, seconds, synchronized=False, rec=None):
 
 
 def recorded_movement(bus, states, delta, seconds, synchronized=False,
-                      output='resultados', live=True):
+                      output='resultados', live=True, target_angles=None):
     rec = Recorder(output, live)
     # Initial readings precede plot creation: retain their acquisition timestamps.
     stamps = [s.position_time_s for s in states if math.isfinite(s.position_time_s)]
@@ -143,7 +152,7 @@ def recorded_movement(bus, states, delta, seconds, synchronized=False,
     rec.run_status = 'interrupted'
     rec.requested_seconds = seconds
     try:
-        test_movement(bus, states, delta, seconds, synchronized, rec=rec)
+        test_movement(bus, states, delta, seconds, synchronized, rec=rec, target_angles=target_angles)
         rec.run_status = 'completed'
     finally:
         rec.close()
@@ -155,7 +164,7 @@ def interactive_menu(bus, ids, output='resultados', live=True):
         print('\n1 - Ler posicao, tensao e temperatura')
         print('2 - Mover servo (alterar deslocamento e tempo)')
         print('3 - Buscar IDs novamente')
-        print('4 - Mover varios servos juntos (inicio em sequencia rapida)')
+        print('4 - Mover varios servos (posicao alvo diferente para cada ID)')
         print('0 - Sair')
         try:
             choice = input('Opcao: ').strip()
@@ -178,10 +187,14 @@ def interactive_menu(bus, ids, output='resultados', live=True):
                 if any(sid not in ids for sid in selected):
                     raise ValueError('Escolha IDs encontrados ou busque novamente pela opcao 3.')
                 print('Os servos recebem comandos diretos, com pequena diferenca no instante de inicio.')
-                delta = float((input('Deslocamento para todos em graus (-100 a +100) [5]: ').strip() or '5').replace(',', '.'))
+                print('Posicoes absolutas em graus, nao deslocamentos. Maximo de 100 graus por movimento.')
+                target_angles = {}
+                for sid in selected:
+                    target_angles[sid] = float(input(f'ID {sid} - posicao alvo em graus (0 a 240): ').strip().replace(',', '.'))
                 seconds = float((input('Tempo para todos em segundos (0.5 a 30) [2]: ').strip() or '2').replace(',', '.'))
                 states = [bus.read_servo(sid) for sid in selected]
-                recorded_movement(bus, states, delta, seconds, output=output, live=live)
+                recorded_movement(bus, states, 0, seconds, output=output, live=live,
+                                  target_angles=target_angles)
                 show_states(bus, selected)
             elif choice == '2':
                 if not ids:
@@ -222,8 +235,14 @@ def main(bus_class=LX225Bus):
     parser.add_argument('--synchronized', action='store_true', help='Inicia TODOS os movimentos pendentes por broadcast')
     parser.add_argument("--output", default="resultados", help="Pasta dos CSV e graficos")
     parser.add_argument("--no-live", action="store_true", help="Salva graficos sem abrir janela")
+    parser.add_argument('--plot-test', action='store_true', help='Testa os quatro graficos com dados SIMULADOS, sem acessar servos')
     args = parser.parse_args()
     try:
+        print(f'Programa: {__file__}', flush=True)
+        if args.plot_test:
+            if args.move or args.scan or args.interactive:
+                raise ValueError('Use --plot-test separadamente de --move, --scan e --interactive.')
+            return plot_demo(args.output, not args.no_live)
         interactive = args.interactive or (len(sys.argv) == 1 and sys.stdin.isatty())
         if args.interactive and (args.scan or args.move):
             raise ValueError('Use --interactive separadamente de --scan e --move.')

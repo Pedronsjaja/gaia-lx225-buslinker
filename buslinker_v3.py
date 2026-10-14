@@ -505,7 +505,21 @@ class Recorder:
         if not live:
             matplotlib.use('Agg')
         import matplotlib.pyplot as plt
+        # A previous headless export or MPLBACKEND=Agg must not silently disable live plots.
+        fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+        if live and fig.canvas.required_interactive_framework is None:
+            plt.close(fig)
+            try:
+                plt.switch_backend('TkAgg')
+                fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+            except (ImportError, RuntimeError) as exc:
+                raise ImportError(
+                    'Nao foi possivel abrir a janela dos graficos. Instale/ative Tkinter '
+                    'no Python utilizado (Linux: python3-tk), ou use --no-live para salvar PNG. '
+                    'Teste sem servos: python test_servos.py --plot-test.'
+                ) from exc
         self.plt = plt
+        self.fig, self.axes = fig, axes
         self.folder = Path(folder) / datetime.now().strftime('%Y%m%d_%H%M%S_%f')
         self.folder.mkdir(parents=True)
         self.file = (self.folder / 'telemetria.csv').open('w', newline='', encoding='utf-8')
@@ -516,10 +530,13 @@ class Recorder:
         self.requested_seconds = math.nan
         self.start = time.monotonic()
         self.live = live
-        self.fig, self.axes = plt.subplots(2, 2, figsize=(12, 8))
         if live:
+            print(f'Graficos ao vivo: backend {matplotlib.get_backend()}; '
+                  f'arquivos em {self.folder.resolve()}', flush=True)
             plt.ion()
             plt.show(block=False)
+            self.fig.canvas.draw()
+            self.fig.canvas.flush_events()
 
     def add(self, state, target=math.nan, status='ok'):
         stamp = state.position_time_s
@@ -579,7 +596,7 @@ class Recorder:
                        initial_time_s=first.get('time_s', math.nan),
                        last_time_s=last.get('time_s', math.nan),
                        observed_duration_s=last.get('time_s', math.nan)-first.get('time_s', math.nan),
-                       sample_count=len(valid), failure_count=sum(r['status'] not in ('ok', 'initial') for r in rows))
+                       sample_count=len(valid), failure_count=sum(r['status'] not in ('ok', 'initial', 'simulated') for r in rows))
             for field in ('angle_deg', 'voltage_v', 'temperature_c'):
                 row['initial_' + field] = first.get(field, math.nan)
                 row['last_' + field] = last.get(field, math.nan)
@@ -597,8 +614,33 @@ class Recorder:
         self.save_summary()
         self.draw()
         self.fig.savefig(self.folder / 'graficos.png', dpi=160)
-        self.plt.close(self.fig)
         print(f'CSV e graficos: {self.folder.resolve()}')
+        try:
+            if self.live:
+                print('Graficos salvos. Feche a janela dos graficos para continuar.', flush=True)
+                self.plt.show(block=True)
+        finally:
+            self.plt.close(self.fig)
+
+
+def plot_demo(output='resultados', live=True):
+    """Exercise the real plot pipeline with explicitly simulated data, without serial access."""
+    from types import SimpleNamespace
+    rec = Recorder(output, live)
+    rec.fig.suptitle('SIMULADO - teste dos graficos, sem conexao com servos')
+    rec.run_status = 'simulated'
+    try:
+        for index in range(21):
+            t = index / 10
+            for sid, direction in ((1, 1), (2, -1)):
+                state = SimpleNamespace(servo_id=sid, identifier=f'SIMULATED_{sid}',
+                    position_time_s=rec.start + t, angle_deg=100 + direction * 10 * t,
+                    voltage_v=7.4, velocity_dps=direction * 10, temperature_c=30)
+                rec.add(state, target=100 + direction * 20, status='simulated')
+        rec.draw()
+    finally:
+        rec.close()
+    return 0
 
 
 def check_state(state, max_temp):
@@ -849,14 +891,23 @@ def discover_servos(bus):
     return ids
 
 
-def test_movement(bus, states, delta, seconds, synchronized=False, rec=None):
+def test_movement(bus, states, delta, seconds, synchronized=False, rec=None, target_angles=None):
     if not states or len({s.servo_id for s in states}) != len(states):
         raise ValueError('Selecione IDs distintos para movimentar.')
     if not math.isfinite(delta) or abs(delta) > 100:
         raise ValueError('Delta deve estar entre -100 e 100 graus.')
     if not math.isfinite(seconds) or not 0.5 <= seconds <= 30:
         raise ValueError('Tempo deve estar entre 0.5 e 30 segundos.')
-    targets = [(s.servo_id, s.angle_deg + delta, seconds) for s in states]
+    if target_angles is None:
+        targets = [(s.servo_id, s.angle_deg + delta, seconds) for s in states]
+    else:
+        if set(target_angles) != {s.servo_id for s in states}:
+            raise ValueError('Informe uma posicao alvo para cada ID selecionado.')
+        targets = [(s.servo_id, target_angles[s.servo_id], seconds) for s in states]
+        for state in states:
+            angle = target_angles[state.servo_id]
+            if not math.isfinite(angle) or abs(angle - state.angle_deg) > 100:
+                raise ValueError(f'ID {state.servo_id}: alvo deve ser finito e ficar a no maximo 100 graus da posicao atual.')
     needs_torque = []
     for state in states:
         check_state(state, 60)
@@ -935,7 +986,7 @@ def test_movement(bus, states, delta, seconds, synchronized=False, rec=None):
 
 
 def recorded_movement(bus, states, delta, seconds, synchronized=False,
-                      output='resultados', live=True):
+                      output='resultados', live=True, target_angles=None):
     rec = Recorder(output, live)
     # Initial readings precede plot creation: retain their acquisition timestamps.
     stamps = [s.position_time_s for s in states if math.isfinite(s.position_time_s)]
@@ -944,7 +995,7 @@ def recorded_movement(bus, states, delta, seconds, synchronized=False,
     rec.run_status = 'interrupted'
     rec.requested_seconds = seconds
     try:
-        test_movement(bus, states, delta, seconds, synchronized, rec=rec)
+        test_movement(bus, states, delta, seconds, synchronized, rec=rec, target_angles=target_angles)
         rec.run_status = 'completed'
     finally:
         rec.close()
@@ -956,7 +1007,7 @@ def interactive_menu(bus, ids, output='resultados', live=True):
         print('\n1 - Ler posicao, tensao e temperatura')
         print('2 - Mover servo (alterar deslocamento e tempo)')
         print('3 - Buscar IDs novamente')
-        print('4 - Mover varios servos juntos (inicio em sequencia rapida)')
+        print('4 - Mover varios servos (posicao alvo diferente para cada ID)')
         print('0 - Sair')
         try:
             choice = input('Opcao: ').strip()
@@ -979,10 +1030,14 @@ def interactive_menu(bus, ids, output='resultados', live=True):
                 if any(sid not in ids for sid in selected):
                     raise ValueError('Escolha IDs encontrados ou busque novamente pela opcao 3.')
                 print('Os servos recebem comandos diretos, com pequena diferenca no instante de inicio.')
-                delta = float((input('Deslocamento para todos em graus (-100 a +100) [5]: ').strip() or '5').replace(',', '.'))
+                print('Posicoes absolutas em graus, nao deslocamentos. Maximo de 100 graus por movimento.')
+                target_angles = {}
+                for sid in selected:
+                    target_angles[sid] = float(input(f'ID {sid} - posicao alvo em graus (0 a 240): ').strip().replace(',', '.'))
                 seconds = float((input('Tempo para todos em segundos (0.5 a 30) [2]: ').strip() or '2').replace(',', '.'))
                 states = [bus.read_servo(sid) for sid in selected]
-                recorded_movement(bus, states, delta, seconds, output=output, live=live)
+                recorded_movement(bus, states, 0, seconds, output=output, live=live,
+                                  target_angles=target_angles)
                 show_states(bus, selected)
             elif choice == '2':
                 if not ids:
@@ -1022,8 +1077,14 @@ def main(bus_class=LX225Bus):
     parser.add_argument('--synchronized', action='store_true', help='Inicia TODOS os movimentos pendentes por broadcast')
     parser.add_argument("--output", default="resultados", help="Pasta dos CSV e graficos")
     parser.add_argument("--no-live", action="store_true", help="Salva graficos sem abrir janela")
+    parser.add_argument('--plot-test', action='store_true', help='Testa os quatro graficos com dados SIMULADOS, sem acessar servos')
     args = parser.parse_args()
     try:
+        print(f'Programa: {__file__}', flush=True)
+        if args.plot_test:
+            if args.move or args.scan or args.interactive:
+                raise ValueError('Use --plot-test separadamente de --move, --scan e --interactive.')
+            return plot_demo(args.output, not args.no_live)
         interactive = args.interactive or (len(sys.argv) == 1 and sys.stdin.isatty())
         if args.interactive and (args.scan or args.move):
             raise ValueError('Use --interactive separadamente de --scan e --move.')

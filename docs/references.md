@@ -1,5 +1,19 @@
 # Referências — gráficos de movimento (2026-10-14)
 
+- [Matplotlib: backends](https://matplotlib.org/stable/users/explain/figure/backends.html):
+  Agg exporta arquivos; TkAgg usa Tkinter para janelas. Aplicação: detectar canvas
+  sem GUI antes de executar ensaio ao vivo; preservar backends GUI funcionais.
+  Reprodução e limites: [diagnóstico da janela](engineering-decisions/2026-10-14-janela-graficos.md).
+
+- [Matplotlib: figuras interativas](https://matplotlib.org/stable/users/interactive.html):
+  consultado para corrigir o fechamento automático ao final da coleta.
+  `show(block=True)` mantém o processamento dos eventos da GUI até fechar as janelas,
+  inclusive em modo interativo. Decisão: salvar PNG/CSV antes de esperar; manter
+  `--no-live` sem espera. Teste automatizado verifica exportação antes de exibir e
+  fechamento posterior; GUI real validada posteriormente no script
+  `tools/check_plot_window.py`, hardware não validado. Reprodução:
+  `python -m unittest discover -s tests -q`.
+
 - [Hiwonder LX-225](https://www.hiwonder.com/products/lx-225): tabela oficial consultada.
   [DATASHEET] 115200 baud, 6–8,4 V, feedback de posição/tensão/temperatura e conversão
   0–1000 para 0–240°. A tabela explícita de protocolo foi adotada apesar da menção

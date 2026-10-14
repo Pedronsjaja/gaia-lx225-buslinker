@@ -70,3 +70,37 @@ class RecordingTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 cli.test_movement(bus, [self.state(temp=temp)], 5, 2)
             bus.move_verified.assert_not_called()
+
+    def test_individual_targets_export_per_servo(self):
+        states = [self.state(), ServoState(2, 'servo_2', 120, 7.4, 0,
+                  temperature_c=30, position_time_s=10)]
+        with tempfile.TemporaryDirectory() as tmp:
+            bus = self.bus()
+            bus.read_servo.side_effect = lambda sid: ServoState(
+                sid, f'servo_{sid}', {1: 90, 2: 140}[sid], 7.4, 0,
+                temperature_c=30, position_time_s=13)
+            with patch.object(cli.time, 'monotonic', side_effect=[10, 10, 14]):
+                cli.recorded_movement(bus, states, 0, 2, output=tmp, live=False,
+                                      target_angles={1: 90, 2: 140})
+            bus.move_group_direct.assert_called_once_with([(1, 90, 2), (2, 140, 2)])
+            folder = next(Path(tmp).iterdir())
+            with (folder / 'comparacao.csv').open() as f:
+                rows = {int(row['servo_id']): row for row in csv.DictReader(f)}
+            for sid, target in ((1, 90), (2, 140)):
+                self.assertAlmostEqual(float(rows[sid]['last_target_deg']), round(target / 0.24) * 0.24)
+            self.assertGreater((folder / 'graficos.png').stat().st_size, 1000)
+
+    def test_invalid_individual_target_blocks_entire_group(self):
+        states = [self.state(), ServoState(2, 'servo_2', 120, 7.4, 0,
+                  temperature_c=30, position_time_s=10)]
+        for targets in ({1: 90}, {1: 90, 2: float('nan')},
+                        {1: 90, 2: 230}, {1: 90, 2: 190}, {1: 90, 2: -1}):
+            with self.subTest(targets=targets):
+                bus = self.bus()
+                bus.read_torque_enabled.return_value = False
+                bus.read_position_limits.return_value = (0, 180)
+                with self.assertRaises(ValueError):
+                    cli.test_movement(bus, states, 0, 2, target_angles=targets)
+                bus.move_verified.assert_not_called()
+                bus.move_group_direct.assert_not_called()
+                bus.move_many_verified.assert_not_called()
