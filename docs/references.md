@@ -38,3 +38,24 @@ necessário; Linux prioriza driver do kernel. Não foi instalado driver nem aber
 Limites: versão exata do pacote WCH e revisão USB da montagem não verificadas;
 nenhuma alegação de compatibilidade física validada por testes em CI.
 Reprodução: executar o roteiro no sistema alvo e registrar versões, montagem e dados.
+
+## Teste de velocidade e relógio — 2026-10-14
+
+Problema: execução [38624539070](https://github.com/Pedronsjaja/gaia-lx225-buslinker/actions/runs/38624539070)
+falhou no Windows/Python 3.12: `test_temperature_and_velocity` esperava zero e recebeu NaN.
+O teste usava duas respostas seriais simuladas consecutivas e o relógio real.
+O driver mantém NaN quando o intervalo é menor ou igual a 1 microsegundo.
+Hipótese sustentada pelo código: as leituras podem compartilhar um instante do relógio;
+o intervalo exato da execução original não foi registrado.
+
+Método: controlar o relógio no teste com 10 e 10,25 s, mantendo a serial simulada.
+Cobrir também instantes iguais (velocidade indisponível) e variação de 5 graus em
+0,25 s (20 graus/s, CALCULADO). Não alterar o driver nem substituir NaN por zero.
+Referência: [Python time.monotonic e resolução do relógio](https://docs.python.org/3/library/time.html#time.monotonic).
+O relógio é monotônico, mas isso não garante um incremento entre chamadas consecutivas.
+
+TESTADO AUTOMATICAMENTE no Windows/Python 3.13.14: 59 testes aprovados com
+`python -m unittest discover -s tests -v`; `python -m pip check` aprovado.
+`python tools/build_standalone.py` não alterou o conteúdo versionado dos gerados;
+`--help` dos dois programas passou. NÃO TESTADO EM HARDWARE.
+Os testes verificam lógica com dados simulados, não a exatidão física da velocidade.

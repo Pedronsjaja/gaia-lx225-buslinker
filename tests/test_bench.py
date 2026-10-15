@@ -94,12 +94,31 @@ class BenchTests(unittest.TestCase):
 
     def test_temperature_and_velocity(self):
         bus = self.bus()
-        first = bus.read_servo(1)
-        second = bus.read_servo(1)
+        # Control acquisition time: consecutive fake replies can share a clock tick.
+        with patch.object(d.time, 'monotonic', return_value=10.0) as clock:
+            first = bus.read_servo(1)
+            clock.return_value = 10.25
+            second = bus.read_servo(1)
         self.assertEqual(first.temperature_c, 35)
         self.assertEqual(first.voltage_v, 7.4)
         self.assertTrue(math.isnan(first.velocity_dps))
         self.assertEqual(second.velocity_dps, 0)
+
+    def test_velocity_with_identical_timestamps_is_unavailable(self):
+        bus = self.bus()
+        with patch.object(d.time, 'monotonic', return_value=10.0):
+            bus.read_servo(1)
+            second = bus.read_servo(1)
+        self.assertTrue(math.isnan(second.velocity_dps))
+
+    def test_velocity_uses_position_difference_and_elapsed_seconds(self):
+        bus = self.bus()
+        with patch.object(d.time, 'monotonic', return_value=10.0) as clock, \
+             patch.object(bus, 'read_angle_deg', side_effect=[120.0, 125.0]):
+            bus.read_servo(1)
+            clock.return_value = 10.25
+            second = bus.read_servo(1)
+        self.assertEqual(second.velocity_dps, 20.0)
 
     def test_id_change_and_collision(self):
         bus = self.bus()
