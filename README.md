@@ -1,13 +1,12 @@
-<div align="center">
+# LX-225 / BusLinker Test Bench
 
-<h1>⚙️ Gaia &#183; LX-225 / BusLinker</h1>
-<p><strong>Da conex&#227;o do primeiro servo &#224; bancada de diagn&#243;stico e calibra&#231;&#227;o.</strong></p>
-<p><kbd>Python &#183; LX-225 &#183; BusLinker V2.5 / V3</kbd></p>
+Python tools for actuator communication, feedback acquisition and reproducible bench experiments with the GAIA team.
 
-<p><a href="https://github.com/Pedronsjaja/gaia-lx225-buslinker/stargazers"><img alt="Estrelas no GitHub" src="https://img.shields.io/github/stars/Pedronsjaja/gaia-lx225-buslinker?style=flat-square&amp;color=147d68"/></a> <a href="https://github.com/Pedronsjaja/gaia-lx225-buslinker/commits/main"><img alt="Último commit" src="https://img.shields.io/github/last-commit/Pedronsjaja/gaia-lx225-buslinker?style=flat-square&amp;color=235789"/></a></p>
-<p><a href="#inicio-rapido">Comece aqui</a> · <a href="#guia-do-projeto">Documentação</a> · <a href="https://github.com/Pedronsjaja/gaia-lx225-buslinker/tree/main">Arquivos</a></p>
+**Status: implemented driver / experimental physical integration.** Position, voltage and temperature are read through the serial protocol; velocity is estimated from successive positions. Automated tests use simulated serial responses. They do not certify the physical assembly, electrical safety or metrological accuracy.
 
-</div>
+**Portfolio role:** the physical acquisition component of a future single-actuator Digital Twin experiment. ROS 2, ros2_control and Gazebo synchronization are **Planned**, not implemented by this driver.
+
+[Start safely](docs/instalacao.md) · [Driver interface](docs/gaia_lx225.md) · [Digital Twin roadmap](docs/digital-twin-roadmap.md)
 
 <a id="inicio-rapido"></a>
 ## 🚀 Comece aqui
