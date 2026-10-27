@@ -114,3 +114,7 @@ O antigo repositório `gaia-humanoid-robot` foi renomeado para este endereço. S
 ## Windows 10/11 e Linux
 
 Consulte o [guia de instalação e testes por sistema](docs/windows-linux.md): drivers USB, Ubuntu/Debian/Mint/Pop!_OS, ambiente Python, gráficos e ensaios com um ou vários servos.
+
+## Aula de Python, ROS 2 e servos
+
+Leia [Da câmera aos servos — guia ilustrado da equipe Gaia](https://github.com/Pedronsjaja/gaia-humanoid-simulation/blob/2db129f822519ea28f9817e6f49a3da896ee8ce6/docs/programacao/da-camera-aos-servos.md) (revisão fixa). Entenda o que o driver Python já faz, o significado de tópicos/services/actions e como nomes e radianos se relacionam com IDs e graus. A arquitetura da ponte ROS/LX-225 continua a definir. A tomada de decisão/autonomia permanece pendente. O material reúne diagramas, ilustração conceitual, exercícios e referências; não implementa controle físico.
