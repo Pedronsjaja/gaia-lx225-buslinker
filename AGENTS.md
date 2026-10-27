@@ -4,7 +4,7 @@
 
 The reusable driver is `servo_testbench.py`, the CLI is `test_servos.py`, and recording/experiments are in `bench_tools.py`. Edit these sources and regenerate both standalone programs with `python tools/build_standalone.py`; do not edit generated copies directly.
 
-Read README and relevant guides before changes. `docs/gaia_lx225.md` defines the actuator boundary; `docs/datasheets/` contains technical references; `docs/validacao-calibracao.md` records validation limits. `docs/digital-twin-roadmap.md` describes planned integration, not implemented ROS hardware support. GAIA joint mechanics belong to the structure repository. OP3 simulation is a reference and does not identify GAIA or provide its physical LX-225 bridge.
+Use the entrypoint above or the applicable guide below; do not read all guides for every task. `docs/gaia_lx225.md` defines the actuator boundary; `docs/datasheets/` contains technical references; `docs/validacao-calibracao.md` records validation limits. `docs/digital-twin-roadmap.md` describes planned integration, not implemented ROS hardware support. GAIA joint mechanics belong to the structure repository. OP3 simulation is a reference and does not identify GAIA or provide its physical LX-225 bridge.
 
 ## Physical commands and evidence
 
@@ -19,3 +19,6 @@ Velocity is ESTIMATED from successive positions; servo feedback is not external 
 English is primary for new R&D documentation and maintained entrypoints. Existing Portuguese technical guides and paths remain during migration; label partial language coverage honestly and preserve useful links. Preserve third-party attribution/provenance and do not invent licensing rights; no root LICENSE is currently supplied.
 
 Definition of Done: appropriate regression checks, consistent generated files when applicable, documented limitations and evidence, and no unsupported hardware or Digital Twin claims.
+
+## Selective context
+Select the driver/CLI/recording entrypoint above and locate the affected symbol and matching test before reading whole files. Reuse summaries only after checking relevant revision/status. Keep source edits and standalone regeneration under one owner; share selected references, not duplicate inventories. Persist only new reusable findings in the existing owning guide.
